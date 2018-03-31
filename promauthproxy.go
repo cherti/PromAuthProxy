@@ -125,7 +125,7 @@ func modifyQuery(q, injectable string) string {
 func rewriteLabelsets(injected string) func(n promql.Node, path []promql.Node) bool {
 	return func(n promql.Node, path []promql.Node) bool {
 		switch n := n.(type) {
-		case *promql.MatrixSelector:
+		case *promql.VectorSelector:
 			// check if label is already present, replace in this case
 			found := false
 			for i, l := range n.LabelMatchers {
@@ -148,7 +148,7 @@ func rewriteLabelsets(injected string) func(n promql.Node, path []promql.Node) b
 				n.LabelMatchers = append(n.LabelMatchers, joblabel)
 
 			}
-		case *promql.VectorSelector:
+		case *promql.MatrixSelector:
 			// check if label is already present, replace in this case
 			found := false
 			for i, l := range n.LabelMatchers {
