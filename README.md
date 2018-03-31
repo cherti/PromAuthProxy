@@ -1,6 +1,6 @@
 # PromAuthProxy
 
-PromAuthProxy is an Authentication-Proxy for the [Prometheus Monitoring System](prometheus.io).
+PromAuthProxy is an Authentication-Proxy for the [Prometheus Monitoring System](https://prometheus.io).
 
 It enables to use a single Prometheus-instance with multiple users, such that each user can query the Prometheus instance, but will only see their own metrics.
 
