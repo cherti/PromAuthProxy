@@ -28,7 +28,11 @@ To ensure that users only see their own metrics, PromAuthProxy takes a target la
 
 ## How to use it
 
-`promauthproxy...`
+By default, promauthproxy reads a `users`-file in the same directory as it is started in.
+Then it creates a reverse HTTP proxy between `:8080` and `127.0.0.1:9090`, which in the default configuration proxies and requests from port 8080 to the Prometheus that (hopefully) listens on `127.0.0.1:9090` and the Prometheus-Interface is visible through the proxy.
+All requests made there are transparently handed over to the Prometheus-instance after the necessary label-injections have been performed and Prometheus' response will be transparently returned as well.
+
+### commandline flag reference
 
     -config.debuglog
       	Log with full details
