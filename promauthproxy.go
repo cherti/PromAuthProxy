@@ -128,10 +128,14 @@ func rewriteLabelsets(injected string) func(n promql.Node, path []promql.Node) b
 		case *promql.MatrixSelector:
 			// check if label is already present, replace in this case
 			found := false
-			for _, l := range n.LabelMatchers {
-				if l.Name == *injectTarget {
-					l.Value = injected
-					found = true
+			for i, l := range n.LabelMatchers {
+				if l.Type == labels.MatchEqual {
+					if l.Name == *injectTarget {
+						l.Value = injected
+						found = true
+					}
+				} else { // drop matcher if not MatchEqual
+					n.LabelMatchers = append(n.LabelMatchers[:i], n.LabelMatchers[i+1:]...)
 				}
 			}
 
@@ -147,10 +151,14 @@ func rewriteLabelsets(injected string) func(n promql.Node, path []promql.Node) b
 		case *promql.VectorSelector:
 			// check if label is already present, replace in this case
 			found := false
-			for _, l := range n.LabelMatchers {
-				if l.Name == *injectTarget {
-					l.Value = injected
-					found = true
+			for i, l := range n.LabelMatchers {
+				if l.Type == labels.MatchEqual {
+					if l.Name == *injectTarget {
+						l.Value = injected
+						found = true
+					}
+				} else { // drop matcher if not MatchEqual
+					n.LabelMatchers = append(n.LabelMatchers[:i], n.LabelMatchers[i+1:]...)
 				}
 			}
 			// if label is not present, inject it
