@@ -9,6 +9,23 @@ It enables to use a single Prometheus-instance with multiple users, such that ea
 PromAuthProxy is a proxy that sits before the Prometheus-intstance in question and currently supporting HTTP Basic Auth as the authentication method of choice to allow access to the Prometheus behind it.
 To ensure that users only see their own metrics, PromAuthProxy takes a target label (by default the `job`-label), inspects the query that is submitted to the prometheus and ensures that every query includes the target label set to the Basic-Auth-username, either by injecting it if not present or overwriting if specified differently.
 
+## Building and running
+
+### manually
+
+    # actually build and run
+    git clone https://github.com/cherti/promauthproxy.git
+    cd promauthproxy
+    go get ./...
+    go build promauthproxy.go
+    ./promauthproxy
+
+
+### automatically using go-toolchain
+
+    go get -u "github.com/cherti/mailexporter"
+    ./mailexporter
+
 ## How to use it
 
 `promauthproxy...`
