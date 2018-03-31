@@ -51,7 +51,7 @@ func director(r *http.Request) {
 	r.URL.Host = *innerAddress
 }
 
-// performRedirect redirects the incoming request to what is specified in the innerAddress-field
+// performRedirect redirects the incoming request to what is specified in the innerAddress-field and modifies all query-parameters in the URL to contain the required labelmatchers
 func performRedirect(w http.ResponseWriter, r *http.Request, username string) {
 
 	newurl := r.URL.Path + "?"
@@ -95,12 +95,15 @@ func redirectAfterAuthCheck(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// hashPasswords provides the password-encoding used in PromAuthProxy.
 func hashPassword(pw string) []byte {
 	pwbyte := []byte(pw)
 	pwhash := sha256.Sum256(pwbyte)
 	return pwhash[:]
 }
 
+// createPasswordEntry reads a username and password from the commandline and
+// creates and prints a valid passwordfile-entry for these credentials.
 func createPasswordEntry() {
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Fprintf(os.Stderr, "Enter username: ")
@@ -113,6 +116,8 @@ func createPasswordEntry() {
 
 }
 
+// modifyQuery modifies a given Prometheus-query-expression to contain the required
+// labelmatchers.
 func modifyQuery(q, injectable string) string {
 	expr, err := promql.ParseExpr(q)
 	if err != nil {
@@ -122,6 +127,9 @@ func modifyQuery(q, injectable string) string {
 	return expr.String()
 }
 
+// rewriteLabelsets returns the function that will be used to walk the
+// Prometheus-query-expression-tree and rewrites the necessary selectors with
+// to the specified username before the query is handed over to Prometheus.
 func rewriteLabelsets(injected string) func(n promql.Node, path []promql.Node) bool {
 	return func(n promql.Node, path []promql.Node) bool {
 		switch n := n.(type) {
