@@ -55,25 +55,27 @@ func director(r *http.Request) {
 func performRedirect(w http.ResponseWriter, r *http.Request, username string) {
 
 	newurl := r.URL.Path + "?"
-	queries := r.URL.Query()
-	for k, params := range queries {
+	queryparams := r.URL.Query()
+	newqueryparams := url.Values{}
+	for k, params := range queryparams {
 		for _, param := range params {
 			if k == "query" {
-				newurl += fmt.Sprintf("%s=%s&", k, modifyQuery(param, username))
+				newqueryparams.Add(k, modifyQuery(param, username))
 			} else {
-				newurl += fmt.Sprintf("%s=%s&", k, param)
+				newqueryparams.Add(k, param)
 			}
 		}
 	}
 
 	if *debug {
 		logDebug.Println("old url:", r.URL)
-		logDebug.Println("new url:", newurl)
 	}
 
-	u, _ := url.Parse(newurl)
+	r.URL.RawQuery = newqueryparams.Encode()
 
-	r.URL = u
+	if *debug {
+		logDebug.Println("new url:", newurl)
+	}
 
 	proxy := &httputil.ReverseProxy{Director: director}
 	proxy.ServeHTTP(w, r)
