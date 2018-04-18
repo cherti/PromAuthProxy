@@ -76,7 +76,6 @@ func director(r *http.Request) {
 func injectLabelIntoNewSilence(r *http.Request, label string) (io.ReadCloser, int64) {
 	// modify POST-request with new silences to alertmanager to inject labelmatcher
 	headerCL := r.Header["Content-Length"]
-	fmt.Println(headerCL)
 	var cl int64
 	if len(headerCL) > 0 {
 		c, err := strconv.ParseInt(headerCL[0], 10, 64)
