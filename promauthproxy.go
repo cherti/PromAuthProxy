@@ -2,16 +2,21 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/prometheus/prometheus/pkg/labels"
@@ -45,36 +50,91 @@ var (
 	debug         = flag.Bool("config.debuglog", false, "Log with full details")
 )
 
+type silence struct {
+	Id        string
+	CreatedBy string
+	Comment   string
+	StartsAt  string
+	EndsAt    string
+	Matchers  []matcher
+}
+
+type matcher struct {
+	Name    string
+	Value   string
+	IsRegex bool
+}
+
 // director modifies the incoming http.request to go to the specified innerAddress
 func director(r *http.Request) {
 	r.URL.Scheme = "http"
 	r.URL.Host = *innerAddress
 }
 
-// performRedirect redirects the incoming request to what is specified in the innerAddress-field and modifies all query-parameters in the URL to contain the required labelmatchers
-func performRedirect(w http.ResponseWriter, r *http.Request, username string) {
-
-	newurl := r.URL.Path + "?"
-	queryparams := r.URL.Query()
-	newqueryparams := url.Values{}
-	for k, params := range queryparams {
-		for _, param := range params {
-			if k == "query" {
-				newqueryparams.Add(k, modifyQuery(param, username))
-			} else {
-				newqueryparams.Add(k, param)
-			}
+// injectLabelIntoNewSilence modifies a new silence request to the alertmanager such that
+// it is guaranteed to contain the to-be-injected label appropriately
+func injectLabelIntoNewSilence(r *http.Request, label string) (io.ReadCloser, int64) {
+	// modify POST-request with new silences to alertmanager to inject labelmatcher
+	headerCL := r.Header["Content-Length"]
+	fmt.Println(headerCL)
+	var cl int64
+	if len(headerCL) > 0 {
+		c, err := strconv.ParseInt(headerCL[0], 10, 64)
+		if err != nil {
+			logError.Println(err)
+		} else {
+			cl = c // actually use the contentlength != 0
 		}
 	}
-
-	if *debug {
-		logDebug.Println("old url:", r.URL)
+	bodycontent := make([]byte, cl)
+	r.Body.Read(bodycontent)
+	n, err := r.Body.Read(bodycontent)
+	if err != nil && err != io.EOF {
+		logError.Println(err, "; bytes read when error occurred:", n)
 	}
+	var s silence
+	err = json.Unmarshal(bodycontent, &s)
+	var b []byte
+	if err != nil {
+		logError.Println(err)
+		b = []byte("") // just put garbage in, Prometheus will do the rest (i.e. nothing)
+	} else {
+		// inject targetlabel as additional filter
+		s.Matchers = append(s.Matchers, matcher{*injectTarget, label, false})
+		b, _ = json.Marshal(s)
+	}
+	return ioutil.NopCloser(bytes.NewReader(b)), int64(len(b))
+}
 
-	r.URL.RawQuery = newqueryparams.Encode()
-
-	if *debug {
-		logDebug.Println("new url:", newurl)
+// performRedirect redirects the incoming request to what is specified in the innerAddress-field and modifies all query-parameters in the URL to contain the required labelmatchers
+func performRedirect(w http.ResponseWriter, r *http.Request, username string) {
+	switch r.URL.Path {
+	case "/api/v1/silences":
+		switch r.Method {
+		case "POST":
+			r.Body, r.ContentLength = injectLabelIntoNewSilence(r, username)
+		}
+	default:
+		// modify Prometheus-GET-Queries to inject label into PromQL-Expressions
+		newurl := r.URL.Path + "?"
+		queryparams := r.URL.Query()
+		newqueryparams := url.Values{}
+		for k, params := range queryparams {
+			for _, param := range params {
+				if k == "query" || k == "filter" {
+					newqueryparams.Add(k, modifyQuery(param, username))
+				} else {
+					newqueryparams.Add(k, param)
+				}
+			}
+		}
+		if *debug {
+			logDebug.Println("old url:", r.URL)
+		}
+		r.URL.RawQuery = newqueryparams.Encode()
+		if *debug {
+			logDebug.Println("new url:", newurl)
+		}
 	}
 
 	proxy := &httputil.ReverseProxy{Director: director}
