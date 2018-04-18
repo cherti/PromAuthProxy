@@ -131,8 +131,15 @@ func performRedirect(w http.ResponseWriter, r *http.Request, username string) {
 		switch r.Method {
 		case "POST":
 			r.Body, r.ContentLength = injectLabelIntoNewSilence(r, username)
+		case "GET":
+			injectLabelIntoQuery(r, "filter", username, true)
 		}
-	default:
+	case "/api/v1/alerts":
+		switch r.Method {
+		case "GET":
+			injectLabelIntoQuery(r, "filter", username, true)
+		}
+	default: // targeted at "/api/v1/silences"
 		// modify Prometheus-GET-Queries to inject label into PromQL-Expressions
 		injectLabelIntoQuery(r, "query", username, false)
 	}
