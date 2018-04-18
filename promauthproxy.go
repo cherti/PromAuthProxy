@@ -106,6 +106,25 @@ func injectLabelIntoNewSilence(r *http.Request, label string) (io.ReadCloser, in
 	return ioutil.NopCloser(bytes.NewReader(b)), int64(len(b))
 }
 
+// injectLabelIntoQuery injects the specified label into the GET-Parameter denoted by queryparam
+// and returns the new URL-encoded GET-Query-Parameters
+func injectLabelIntoQuery(r *http.Request, queryparam, label string) string {
+	// modify Prometheus-GET-Queries to inject label into PromQL-Expressions
+	queryparams := r.URL.Query()
+	newqueryparams := url.Values{}
+	for k, params := range queryparams {
+		for _, param := range params {
+			if k == queryparam {
+				newqueryparams.Add(k, modifyQuery(param, label))
+			} else {
+				newqueryparams.Add(k, param)
+			}
+		}
+	}
+
+	return newqueryparams.Encode()
+}
+
 // performRedirect redirects the incoming request to what is specified in the innerAddress-field and modifies all query-parameters in the URL to contain the required labelmatchers
 func performRedirect(w http.ResponseWriter, r *http.Request, username string) {
 	switch r.URL.Path {
@@ -115,25 +134,12 @@ func performRedirect(w http.ResponseWriter, r *http.Request, username string) {
 			r.Body, r.ContentLength = injectLabelIntoNewSilence(r, username)
 		}
 	default:
-		// modify Prometheus-GET-Queries to inject label into PromQL-Expressions
-		newurl := r.URL.Path + "?"
-		queryparams := r.URL.Query()
-		newqueryparams := url.Values{}
-		for k, params := range queryparams {
-			for _, param := range params {
-				if k == "query" || k == "filter" {
-					newqueryparams.Add(k, modifyQuery(param, username))
-				} else {
-					newqueryparams.Add(k, param)
-				}
-			}
-		}
 		if *debug {
 			logDebug.Println("old url:", r.URL)
 		}
-		r.URL.RawQuery = newqueryparams.Encode()
+		r.URL.RawQuery = injectLabelIntoQuery(r, "query", username)
 		if *debug {
-			logDebug.Println("new url:", newurl)
+			logDebug.Println("new url:", r.URL)
 		}
 	}
 
