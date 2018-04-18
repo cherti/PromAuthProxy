@@ -14,7 +14,6 @@ import (
 	"log"
 	"net/http"
 	"net/http/httputil"
-	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -106,26 +105,27 @@ func injectLabelIntoNewSilence(r *http.Request, label string) (io.ReadCloser, in
 }
 
 // injectLabelIntoQuery injects the specified label into the GET-Parameter denoted by queryparam
-// and returns the new URL-encoded GET-Query-Parameters
-func injectLabelIntoQuery(r *http.Request, queryparam, label string) string {
-	// modify Prometheus-GET-Queries to inject label into PromQL-Expressions
-	queryparams := r.URL.Query()
-	newqueryparams := url.Values{}
-	for k, params := range queryparams {
-		for _, param := range params {
-			if k == queryparam {
-				newqueryparams.Add(k, modifyQuery(param, label))
-			} else {
-				newqueryparams.Add(k, param)
-			}
+// in the parameter set of the supplied requespointer
+func injectLabelIntoQuery(r *http.Request, GETparam, label string, createIfAbsent bool) {
+	if vals, ok := r.URL.Query()[GETparam]; ok {
+		for i, promquery := range vals {
+			vals[i] = modifyQuery(promquery, label)
+		}
+	} else {
+		if createIfAbsent {
+			p := r.URL.Query()
+			p.Add(GETparam, "{"+*injectTarget+"="+label+"}")
+			r.URL.RawQuery = p.Encode()
 		}
 	}
-
-	return newqueryparams.Encode()
 }
 
 // performRedirect redirects the incoming request to what is specified in the innerAddress-field and modifies all query-parameters in the URL to contain the required labelmatchers
 func performRedirect(w http.ResponseWriter, r *http.Request, username string) {
+	if *debug && r.Method == "GET" {
+		logDebug.Println("old url:", r.URL)
+	}
+
 	switch r.URL.Path {
 	case "/api/v1/silences":
 		switch r.Method {
@@ -133,13 +133,12 @@ func performRedirect(w http.ResponseWriter, r *http.Request, username string) {
 			r.Body, r.ContentLength = injectLabelIntoNewSilence(r, username)
 		}
 	default:
-		if *debug {
-			logDebug.Println("old url:", r.URL)
-		}
-		r.URL.RawQuery = injectLabelIntoQuery(r, "query", username)
-		if *debug {
-			logDebug.Println("new url:", r.URL)
-		}
+		// modify Prometheus-GET-Queries to inject label into PromQL-Expressions
+		injectLabelIntoQuery(r, "query", username, false)
+	}
+
+	if *debug && r.Method == "GET" {
+		logDebug.Println("new url:", r.URL)
 	}
 
 	proxy := &httputil.ReverseProxy{Director: director}
