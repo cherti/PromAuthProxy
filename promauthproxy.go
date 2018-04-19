@@ -207,12 +207,15 @@ func createPasswordEntry() {
 // modifyQuery modifies a given Prometheus-query-expression to contain the required
 // labelmatchers.
 func modifyQuery(q, injectable string) string {
+	logDebug.Println("Incoming query:", q)
 	expr, err := promql.ParseExpr(q)
 	if err != nil {
-		log.Fatal("ERROR, invalid query:", err)
+		logError.Fatal("ERROR, invalid query:", err)
 	}
 	promql.Inspect(expr, rewriteLabelsets(injectable))
-	return expr.String()
+	q = expr.String()
+	logDebug.Println("Outgoing query:", q)
+	return q
 }
 
 // rewriteLabelsets returns the function that will be used to walk the
