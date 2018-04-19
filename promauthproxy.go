@@ -14,6 +14,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httputil"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -106,18 +107,32 @@ func injectLabelIntoNewSilence(r *http.Request, label string) (io.ReadCloser, in
 
 // injectLabelIntoQuery injects the specified label into the GET-Parameter denoted by queryparam
 // in the parameter set of the supplied requespointer
-func injectLabelIntoQuery(r *http.Request, GETparam, label string, createIfAbsent bool) {
-	if vals, ok := r.URL.Query()[GETparam]; ok {
-		for i, promquery := range vals {
-			vals[i] = modifyQuery(promquery, label)
-		}
-	} else {
-		if createIfAbsent {
-			p := r.URL.Query()
-			p.Add(GETparam, "{"+*injectTarget+"="+label+"}")
-			r.URL.RawQuery = p.Encode()
+func injectLabelIntoQuery(r *http.Request, GETparam, label string, createIfAbsent bool, ensureBracketEnclose bool) {
+	found := false
+
+	queryparams := r.URL.Query()
+	newqueryparams := url.Values{}
+	for k, params := range queryparams {
+		for _, param := range params {
+			if k == GETparam {
+				if ensureBracketEnclose && !strings.HasSuffix(param, "}") {
+					newqueryparams.Add(k, modifyQuery("{"+param+"}", label))
+				} else {
+					newqueryparams.Add(k, modifyQuery(param, label))
+				}
+				found = true
+			} else {
+				newqueryparams.Add(k, param)
+			}
 		}
 	}
+
+	if !found && createIfAbsent {
+		p := r.URL.Query()
+		p.Add(GETparam, "{"+*injectTarget+"="+label+"}")
+		r.URL.RawQuery = p.Encode()
+	}
+	r.URL.RawQuery = newqueryparams.Encode()
 }
 
 // performRedirect redirects the incoming request to what is specified in the innerAddress-field and modifies all query-parameters in the URL to contain the required labelmatchers
@@ -132,16 +147,16 @@ func performRedirect(w http.ResponseWriter, r *http.Request, username string) {
 		case "POST":
 			r.Body, r.ContentLength = injectLabelIntoNewSilence(r, username)
 		case "GET":
-			injectLabelIntoQuery(r, "filter", username, true)
+			injectLabelIntoQuery(r, "filter", username, true, true)
 		}
 	case "/api/v1/alerts":
 		switch r.Method {
 		case "GET":
-			injectLabelIntoQuery(r, "filter", username, true)
+			injectLabelIntoQuery(r, "filter", username, true, true)
 		}
 	default: // targeted at "/api/v1/silences"
 		// modify Prometheus-GET-Queries to inject label into PromQL-Expressions
-		injectLabelIntoQuery(r, "query", username, false)
+		injectLabelIntoQuery(r, "query", username, false, false)
 	}
 
 	if *debug && r.Method == "GET" {
