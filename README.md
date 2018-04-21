@@ -23,8 +23,8 @@ To ensure that users only see their own metrics, PromAuthProxy takes a target la
 
 ### automatically using go-toolchain
 
-    go get -u "github.com/cherti/mailexporter"
-    ./mailexporter
+    go get -u "github.com/cherti/promauthproxy"
+    ./promauthproxy
 
 ## How to use it
 
