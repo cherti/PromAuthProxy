@@ -6,8 +6,17 @@ It enables to use a single Prometheus-instance with multiple users, such that ea
 
 ## How it works
 
+### with Prometheus
+
 PromAuthProxy is a proxy that sits before the Prometheus-intstance in question and currently supporting HTTP Basic Auth as the authentication method of choice to allow access to the Prometheus behind it.
 To ensure that users only see their own metrics, PromAuthProxy takes a target label (by default the `job`-label), inspects the query that is submitted to the prometheus and ensures that every query includes the target label set to the Basic-Auth-username, either by injecting it if not present or overwriting if specified differently.
+Currently, the target-list and the rules-list are not filtered as this would require modifying the HTML response.
+
+### with Alertmanager
+
+Similar to the Prometheus-Setup, PromAuthProxy injects the target-label with the login name as value into every query and inspection of a silence, as well as into the generation of a new silence.
+This means that users can only see alerts with the target-label set to their username and no other and can only generate new silences with the according matcher included (actually users can generate a silence without and the matcher is injected by PromAuthProxy automatically).
+Therefore with PromAuthProxy before users should not be able to tell if other people are using the same alertmanager.
 
 ## Building and running
 
