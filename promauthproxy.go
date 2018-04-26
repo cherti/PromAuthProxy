@@ -210,7 +210,10 @@ func modifyQuery(q, injectable string) string {
 	logDebug.Println("Incoming query:", q)
 	expr, err := promql.ParseExpr(q)
 	if err != nil {
-		logError.Fatal("ERROR, invalid query:", err)
+		// Prometheus will return a failure as well and not hand out any results
+		// but instead define the syntax error. The corrected query will then
+		// evaluate correctly and the appropriate label injected
+		return q
 	}
 	promql.Inspect(expr, rewriteLabelsets(injectable))
 	q = expr.String()
