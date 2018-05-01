@@ -72,7 +72,7 @@ The output-line can also be copied to the file manually, of course.
 
 ## License
 
-This works is released under the [GNU General Public License v3](https://www.gnu.org/licenses/gpl-3.0.txt). You can find a copy of this license at https://www.gnu.org/licenses/gpl-3.0.txt.
+This works is released under the [GNU General Public License v3](https://www.gnu.org/licenses/gpl-3.0.txt). You can find a copy of this license in the file `LICENSE` or at https://www.gnu.org/licenses/gpl-3.0.txt.
 
 ## Remark
 
