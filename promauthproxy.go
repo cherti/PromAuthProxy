@@ -226,8 +226,8 @@ func modifyQuery(q, injectable string) string {
 // rewriteLabelsets returns the function that will be used to walk the
 // Prometheus-query-expression-tree and rewrites the necessary selectors with
 // to the specified username before the query is handed over to Prometheus.
-func rewriteLabelsets(injected string) func(n promql.Node, path []promql.Node) bool {
-	return func(n promql.Node, path []promql.Node) bool {
+func rewriteLabelsets(injected string) func(n promql.Node, path []promql.Node) error {
+	return func(n promql.Node, path []promql.Node) error {
 		switch n := n.(type) {
 		case *promql.VectorSelector:
 			// check if label is already present, replace in this case
@@ -274,7 +274,7 @@ func rewriteLabelsets(injected string) func(n promql.Node, path []promql.Node) b
 				n.LabelMatchers = append(n.LabelMatchers, joblabel) // this doesn't compile with compiler error
 			}
 		}
-		return true
+		return nil
 	}
 }
 
