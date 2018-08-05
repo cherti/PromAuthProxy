@@ -185,6 +185,10 @@ func performRedirect(w http.ResponseWriter, r *http.Request, username string) {
 		bw := &bufferedResponseWriter{ResponseWriter: w}
 		proxy.ServeHTTP(bw, r)
 		w.Write(filterTargets(string(bw.buf.Bytes()), username))
+	case "/alerts":
+		bw := &bufferedResponseWriter{ResponseWriter: w}
+		proxy.ServeHTTP(bw, r)
+		w.Write(rewriteAlerts(string(bw.buf.Bytes()), username))
 	default:
 		proxy.ServeHTTP(w, r)
 	}
@@ -226,6 +230,90 @@ func filterTargets(page string, username string) []byte {
 	buf := new(bytes.Buffer)
 	html.Render(buf, doc)
 	return buf.Bytes()
+}
+
+// rewriteAlerts rewrites the alert-page in a way, that users always only see their alerts
+// but other people's alerts always seem green and fine (except for reordering).
+func rewriteAlerts(page, username string) []byte {
+
+	doc, err := html.Parse(strings.NewReader(page))
+	if err != nil {
+		logError.Println(err)
+		return []byte("500 - Something went wrong. If this problem persists, please contact your operator.")
+	}
+
+	var f func(*html.Node, string)
+
+	f = func(n *html.Node, token string) {
+		if n.Type == html.ElementNode && n.Data == "tr" {
+			class := getClass(n)
+			if class == "warning alert_header" || class == "danger alert_header" {
+				rewriteAlert(n, token)
+			}
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			f(c, token)
+		}
+	}
+
+	f(doc, username)
+	buf := new(bytes.Buffer)
+	html.Render(buf, doc)
+	return buf.Bytes()
+}
+
+// rewriteAlert takes a html-alert-node and rewrites it according to the given token.
+func rewriteAlert(n *html.Node, username string) {
+	for c1 := n.FirstChild; c1 != nil; c1 = c1.NextSibling {
+		if c1.Data == "td" {
+			for c2 := c1.FirstChild; c2 != nil; c2 = c2.NextSibling {
+				if c2.Data == "b" {
+					if strings.HasPrefix(c2.FirstChild.Data, username) {
+						return
+					}
+
+					// set alert count to zero
+					c2.NextSibling.Data = " (0 active)"
+				}
+
+				//fmt.Println(c2.Data) //.NextSibling.NextSibling.Data) //.FirstChild.Data)
+				//fmt.Println(c.FirstChild.Data) //.NextSibling.NextSibling.Data) //.FirstChild.Data)
+			}
+		}
+	}
+	// set class to success alert header
+	for _, a := range n.FirstChild.Attr {
+		fmt.Println(a.Key, a.Val)
+	}
+	for i, a := range n.Attr {
+		if a.Key == "class" {
+			n.Attr[i] = html.Attribute{a.Namespace, a.Key, "success alert_header"}
+		}
+	}
+	for c := n.NextSibling; c != nil; c = c.NextSibling {
+		if getClass(c) == "alert_details" {
+
+			// drop alert details/labels
+			for c1 := c.FirstChild; c1 != nil; c1 = c1.NextSibling {
+				for c2 := c1.FirstChild; c2 != nil; c2 = c2.NextSibling {
+					if c2.Data == "table" && getClass(c2) == "table table-bordered table-hover table-condensed alert_elements_table" {
+						c2.Parent.RemoveChild(c2)
+					}
+				}
+			}
+			break
+		}
+	}
+}
+
+// getClass returns the class of an html-node if there is any, otherwise an empty string
+func getClass(n *html.Node) string {
+	for _, a := range n.Attr {
+		if a.Key == "class" {
+			return a.Val
+		}
+	}
+	return ""
 }
 
 // redirectAfterAuthCheck checks for correct authentication-credentials and either applies
