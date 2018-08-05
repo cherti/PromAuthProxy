@@ -21,6 +21,7 @@ import (
 
 	"github.com/prometheus/prometheus/pkg/labels"
 	"github.com/prometheus/prometheus/promql"
+	"golang.org/x/net/html"
 )
 
 var (
@@ -135,6 +136,19 @@ func injectLabelIntoQuery(r *http.Request, GETparam, label string, createIfAbsen
 	r.URL.RawQuery = newqueryparams.Encode()
 }
 
+// bufferedResponseWriter behaves like a responseWriter, but bufferes bytes written to it for later
+// readout and modification. It is intended that those modified bytes are then written to the
+// responseWriter used when creating the bufferedResponseWriter.
+type bufferedResponseWriter struct {
+	http.ResponseWriter
+	buf bytes.Buffer
+}
+
+// Write writes the given bytes to an internal buffer for later read-out.
+func (w *bufferedResponseWriter) Write(p []byte) (n int, err error) {
+	return w.buf.Write(p)
+}
+
 // performRedirect redirects the incoming request to what is specified in the innerAddress-field and modifies all query-parameters in the URL to contain the required labelmatchers
 func performRedirect(w http.ResponseWriter, r *http.Request, username string) {
 	if *debug && r.Method == "GET" {
@@ -166,7 +180,52 @@ func performRedirect(w http.ResponseWriter, r *http.Request, username string) {
 	}
 
 	proxy := &httputil.ReverseProxy{Director: director}
-	proxy.ServeHTTP(w, r)
+	switch r.URL.Path {
+	case "/targets":
+		bw := &bufferedResponseWriter{ResponseWriter: w}
+		proxy.ServeHTTP(bw, r)
+		w.Write(filterTargets(string(bw.buf.Bytes()), username))
+	default:
+		proxy.ServeHTTP(w, r)
+	}
+}
+
+// filterTargets removes all targets that do not belong to the logged-in user
+// from the targets-list
+func filterTargets(in string, username string) []byte {
+	doc, err := html.Parse(strings.NewReader(in))
+	if err != nil {
+		logError.Println(err)
+		return []byte("500 - Something went wrong. If this problem persists, please contact your operator.")
+	}
+
+	var f func(*html.Node, string)
+	f = func(n *html.Node, token string) {
+		if n.Type == html.ElementNode && n.Data == "h2" {
+			for c := n.FirstChild; c != nil; c = c.NextSibling {
+				if c.Data == "a" {
+					for _, a := range c.Attr {
+						if a.Key == "id" && a.Val != "job-"+token {
+							for followup := n.NextSibling; followup != nil; followup = followup.NextSibling {
+								if followup.Data == "table" {
+									n.Parent.RemoveChild(followup)
+									n.Parent.RemoveChild(n)
+									break
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			f(c, token)
+		}
+	}
+	f(doc, username)
+	buf := new(bytes.Buffer)
+	html.Render(buf, doc)
+	return buf.Bytes()
 }
 
 // redirectAfterAuthCheck checks for correct authentication-credentials and either applies
