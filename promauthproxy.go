@@ -192,8 +192,8 @@ func performRedirect(w http.ResponseWriter, r *http.Request, username string) {
 
 // filterTargets removes all targets that do not belong to the logged-in user
 // from the targets-list
-func filterTargets(in string, username string) []byte {
-	doc, err := html.Parse(strings.NewReader(in))
+func filterTargets(page string, username string) []byte {
+	doc, err := html.Parse(strings.NewReader(page))
 	if err != nil {
 		logError.Println(err)
 		return []byte("500 - Something went wrong. If this problem persists, please contact your operator.")
