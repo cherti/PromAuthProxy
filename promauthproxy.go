@@ -170,6 +170,8 @@ func performRedirect(w http.ResponseWriter, r *http.Request, username string) {
 		}
 	case "/federate":
 		injectLabelIntoQuery(r, "match[]", username, true, true)
+	case "/service-discovery":
+		r.URL.Path = "/targets"
 	default: // targeted at "/api/v1/silences"
 		// modify Prometheus-GET-Queries to inject label into PromQL-Expressions
 		injectLabelIntoQuery(r, "query", username, false, false)
