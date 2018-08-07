@@ -151,7 +151,7 @@ func (w *bufferedResponseWriter) Write(p []byte) (n int, err error) {
 
 // performRedirect redirects the incoming request to what is specified in the innerAddress-field and modifies all query-parameters in the URL to contain the required labelmatchers
 func performRedirect(w http.ResponseWriter, r *http.Request, username string) {
-	if *debug && r.Method == "GET" {
+	if r.Method == "GET" {
 		logDebug.Println("old url:", r.URL)
 	}
 
@@ -177,7 +177,7 @@ func performRedirect(w http.ResponseWriter, r *http.Request, username string) {
 		injectLabelIntoQuery(r, "query", username, false, false)
 	}
 
-	if *debug && r.Method == "GET" {
+	if r.Method == "GET" {
 		logDebug.Println("new url:", r.URL)
 	}
 
@@ -433,6 +433,10 @@ func main() {
 		logInfo.SetFlags(3)
 		logDebug.SetFlags(3)
 		logError.SetFlags(3)
+	}
+
+	if !*debug {
+		logDebug.SetOutput(ioutil.Discard)
 	}
 
 	passwords = make(map[string][]byte)
