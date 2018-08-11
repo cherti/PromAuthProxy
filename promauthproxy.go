@@ -380,48 +380,35 @@ func rewriteLabelsets(injected string) func(n promql.Node, path []promql.Node) e
 		switch n := n.(type) {
 		case *promql.VectorSelector:
 			// check if label is already present, replace in this case
-			found := false
 			for i, l := range n.LabelMatchers {
-				if l.Type == labels.MatchEqual {
-					if l.Name == *injectTarget {
-						l.Value = injected
-						found = true
-					}
-				} else { // drop matcher if not MatchEqual
+				// drop label matcher to be replaced if present
+				if l.Name == *injectTarget {
 					n.LabelMatchers = append(n.LabelMatchers[:i], n.LabelMatchers[i+1:]...)
 				}
 			}
 
-			// if label is not present, inject it
-			if !found {
-				joblabel, err := labels.NewMatcher(labels.MatchEqual, *injectTarget, injected)
-				if err != nil {
-					//handle
-				}
-				n.LabelMatchers = append(n.LabelMatchers, joblabel)
-
+			// inject desired label
+			injectedLabelMatcher, err := labels.NewMatcher(labels.MatchEqual, *injectTarget, injected)
+			if err != nil {
+				// handle appropriately
 			}
+			n.LabelMatchers = append(n.LabelMatchers, injectedLabelMatcher)
+
 		case *promql.MatrixSelector:
 			// check if label is already present, replace in this case
-			found := false
 			for i, l := range n.LabelMatchers {
-				if l.Type == labels.MatchEqual {
-					if l.Name == *injectTarget {
-						l.Value = injected
-						found = true
-					}
-				} else { // drop matcher if not MatchEqual
+				// drop label matcher to be replaced if present
+				if l.Name == *injectTarget {
 					n.LabelMatchers = append(n.LabelMatchers[:i], n.LabelMatchers[i+1:]...)
 				}
 			}
-			// if label is not present, inject it
-			if !found {
-				joblabel, err := labels.NewMatcher(labels.MatchEqual, *injectTarget, injected)
-				if err != nil {
-					//handle
-				}
-				n.LabelMatchers = append(n.LabelMatchers, joblabel) // this doesn't compile with compiler error
+
+			// inject desired label
+			injectedLabelMatcher, err := labels.NewMatcher(labels.MatchEqual, *injectTarget, injected)
+			if err != nil {
+				// handle appropriately
 			}
+			n.LabelMatchers = append(n.LabelMatchers, injectedLabelMatcher)
 		}
 		return nil
 	}
