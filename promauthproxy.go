@@ -30,7 +30,8 @@ var (
 	logError = log.New(os.Stdout, "ERROR: ", 0)
 
 	// operation
-	injectTarget = flag.String("inject.label", "job", "label to inject or overwrite")
+	injectTarget       = flag.String("inject.label", "job", "label to inject or overwrite")
+	injectSourceHeader = flag.String("inject.source", "X-prometheus-injectable", "HTTP header specifying label to-be-injected")
 
 	// addresses and protocols
 	outerAddress = flag.String("web.listen-address", ":8080", "address exposed to outside")
@@ -146,7 +147,7 @@ func performRedirectWithInject(w http.ResponseWriter, r *http.Request) {
 		logDebug.Println("old url:", r.URL)
 	}
 
-	injectedLabel := r.Header.Get("X-prometheus-injectable")
+	injectedLabel := r.Header.Get(*injectSourceHeader)
 
 	switch r.URL.Path {
 	case "/api/v1/silences":
