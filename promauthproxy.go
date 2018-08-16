@@ -155,28 +155,28 @@ func performRedirectWithInject(w http.ResponseWriter, r *http.Request) {
 		logDebug.Println("old url:", r.URL)
 	}
 
-	username := r.Header.Get("X-prometheus-injectable")
+	injectedLabel := r.Header.Get("X-prometheus-injectable")
 
 	switch r.URL.Path {
 	case "/api/v1/silences":
 		switch r.Method {
 		case "POST":
-			r.Body, r.ContentLength = injectLabelIntoNewSilence(r, username)
+			r.Body, r.ContentLength = injectLabelIntoNewSilence(r, injectedLabel)
 		case "GET":
-			injectLabelIntoQuery(r, "filter", username, true, true)
+			injectLabelIntoQuery(r, "filter", injectedLabel, true, true)
 		}
 	case "/api/v1/alerts":
 		switch r.Method {
 		case "GET":
-			injectLabelIntoQuery(r, "filter", username, true, true)
+			injectLabelIntoQuery(r, "filter", injectedLabel, true, true)
 		}
 	case "/federate":
-		injectLabelIntoQuery(r, "match[]", username, true, true)
+		injectLabelIntoQuery(r, "match[]", injectedLabel, true, true)
 	case "/service-discovery":
 		r.URL.Path = "/targets"
 	default: // targeted at "/api/v1/silences"
 		// modify Prometheus-GET-Queries to inject label into PromQL-Expressions
-		injectLabelIntoQuery(r, "query", username, false, false)
+		injectLabelIntoQuery(r, "query", injectedLabel, false, false)
 	}
 
 	if r.Method == "GET" {
@@ -205,7 +205,7 @@ func performRedirectWithInject(w http.ResponseWriter, r *http.Request) {
 
 // filterTargets removes all targets that do not belong to the logged-in user
 // from the targets-list
-func filterTargets(page string, username string) []byte {
+func filterTargets(page string, injectedLabel string) []byte {
 	doc, err := html.Parse(strings.NewReader(page))
 	if err != nil {
 		logError.Println(err)
@@ -235,7 +235,7 @@ func filterTargets(page string, username string) []byte {
 			f(c, token)
 		}
 	}
-	f(doc, username)
+	f(doc, injectedLabel)
 	buf := new(bytes.Buffer)
 	html.Render(buf, doc)
 	return buf.Bytes()
@@ -243,7 +243,7 @@ func filterTargets(page string, username string) []byte {
 
 // rewriteAlerts rewrites the alert-page in a way, that users always only see their alerts
 // but other people's alerts always seem green and fine (except for reordering).
-func rewriteAlerts(page, username string) []byte {
+func rewriteAlerts(page, injectedLabel string) []byte {
 
 	doc, err := html.Parse(strings.NewReader(page))
 	if err != nil {
@@ -265,19 +265,19 @@ func rewriteAlerts(page, username string) []byte {
 		}
 	}
 
-	f(doc, username)
+	f(doc, injectedLabel)
 	buf := new(bytes.Buffer)
 	html.Render(buf, doc)
 	return buf.Bytes()
 }
 
 // rewriteAlert takes a html-alert-node and rewrites it according to the given token.
-func rewriteAlert(n *html.Node, username string) {
+func rewriteAlert(n *html.Node, injectedLabel string) {
 	for c1 := n.FirstChild; c1 != nil; c1 = c1.NextSibling {
 		if c1.Data == "td" {
 			for c2 := c1.FirstChild; c2 != nil; c2 = c2.NextSibling {
 				if c2.Data == "b" {
-					if strings.HasPrefix(c2.FirstChild.Data, username) {
+					if strings.HasPrefix(c2.FirstChild.Data, injectedLabel) {
 						return
 					}
 
@@ -365,7 +365,7 @@ func modifyQuery(q, injectable string) string {
 
 // rewriteLabelsets returns the function that will be used to walk the
 // Prometheus-query-expression-tree and rewrites the necessary selectors with
-// to the specified username before the query is handed over to Prometheus.
+// to the specified injected label before the query is handed over to Prometheus.
 func rewriteLabelsets(injected string) func(n promql.Node, path []promql.Node) error {
 	return func(n promql.Node, path []promql.Node) error {
 		switch n := n.(type) {
