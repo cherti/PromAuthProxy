@@ -41,10 +41,6 @@ var (
 	passwordfile = flag.String("passwordfile", "users", "file with user-password-mapping")
 	passwords    map[string][]byte
 
-	// TLS
-	crt = flag.String("crt", "", "path to TLS public key file for outer connection")
-	key = flag.String("key", "", "path to TLS private key file for outer connection")
-
 	// misc
 	logTimestamps = flag.Bool("config.log-timestamps", false, "Log with timestamps")
 	debug         = flag.Bool("config.debuglog", false, "Log with full details")
@@ -450,13 +446,5 @@ func main() {
 
 	logInfo.Println("starting redirector from", *outerAddress, "to", *innerAddress)
 	http.HandleFunc("/", performRedirectWithInject)
-
-	useTLS := *crt != "" && *key != ""
-	if useTLS {
-		logInfo.Println("TLS enabled")
-		logError.Fatal(http.ListenAndServeTLS(*outerAddress, *crt, *key, nil))
-	} else {
-		logInfo.Println("TLS disabled")
-		logError.Fatal(http.ListenAndServe(*outerAddress, nil))
-	}
+	logError.Fatal(http.ListenAndServe(*outerAddress, nil))
 }
