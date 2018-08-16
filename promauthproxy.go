@@ -30,16 +30,11 @@ var (
 	logError = log.New(os.Stdout, "ERROR: ", 0)
 
 	// operation
-	createEntry  = flag.Bool("new", false, "create new entry for passwordfile")
 	injectTarget = flag.String("inject.label", "job", "label to inject or overwrite")
 
 	// addresses and protocols
 	outerAddress = flag.String("web.listen-address", ":8080", "address exposed to outside")
 	innerAddress = flag.String("web.proxy-to", "127.0.0.1:9090", "address to proxy to")
-
-	// HTTP basic auth
-	passwordfile = flag.String("passwordfile", "users", "file with user-password-mapping")
-	passwords    map[string][]byte
 
 	// misc
 	logTimestamps = flag.Bool("config.log-timestamps", false, "Log with timestamps")
@@ -412,37 +407,6 @@ func main() {
 	if !*debug {
 		logDebug.SetOutput(ioutil.Discard)
 	}
-
-	passwords = make(map[string][]byte)
-
-	if *createEntry {
-		createPasswordEntry()
-		os.Exit(0)
-	}
-
-	// load passwords
-	logInfo.Println("reading user-password mappinggs from", *passwordfile)
-
-	file, err := os.Open(*passwordfile)
-	if err != nil {
-		log.Fatal(err)
-	}
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-		res := strings.Split(line, " ")
-		if len(res) != 2 {
-			logError.Println("Error parsing line:", line)
-			continue
-		}
-		pwbytes, err := base64.StdEncoding.DecodeString(res[1])
-		if err != nil {
-			logError.Println("Error decoding line:", line)
-			continue
-		}
-		passwords[res[0]] = pwbytes
-	}
-	file.Close()
 
 	logInfo.Println("starting redirector from", *outerAddress, "to", *innerAddress)
 	http.HandleFunc("/", performRedirectWithInject)
