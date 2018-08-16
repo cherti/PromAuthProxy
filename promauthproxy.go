@@ -182,18 +182,23 @@ func performRedirect(w http.ResponseWriter, r *http.Request, username string) {
 	}
 
 	proxy := &httputil.ReverseProxy{Director: director}
-	switch r.URL.Path {
-	case "/targets":
-		bw := &bufferedResponseWriter{ResponseWriter: w}
-		proxy.ServeHTTP(bw, r)
-		w.Write(filterTargets(string(bw.buf.Bytes()), username))
-	case "/alerts":
-		bw := &bufferedResponseWriter{ResponseWriter: w}
-		proxy.ServeHTTP(bw, r)
-		w.Write(rewriteAlerts(string(bw.buf.Bytes()), username))
-	default:
-		proxy.ServeHTTP(w, r)
+	if *injectTarget == "job" {
+		// if injection is made into the job-label we assume this is used as a user-separation
+		// mechanism, therefore we can use that assumption to filter the targets and alerts accordingly
+		switch r.URL.Path {
+		case "/targets":
+			bw := &bufferedResponseWriter{ResponseWriter: w}
+			proxy.ServeHTTP(bw, r)
+			w.Write(filterTargets(string(bw.buf.Bytes()), injectedLabel))
+			return
+		case "/alerts":
+			bw := &bufferedResponseWriter{ResponseWriter: w}
+			proxy.ServeHTTP(bw, r)
+			w.Write(rewriteAlerts(string(bw.buf.Bytes()), injectedLabel))
+			return
+		}
 	}
+	proxy.ServeHTTP(w, r)
 }
 
 // filterTargets removes all targets that do not belong to the logged-in user
