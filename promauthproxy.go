@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/sha256"
-	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
 	"flag"
@@ -149,11 +148,14 @@ func (w *bufferedResponseWriter) Write(p []byte) (n int, err error) {
 	return w.buf.Write(p)
 }
 
-// performRedirect redirects the incoming request to what is specified in the innerAddress-field and modifies all query-parameters in the URL to contain the required labelmatchers
-func performRedirect(w http.ResponseWriter, r *http.Request, username string) {
+// performRedirect redirects the incoming request to what is specified in the innerAddress-field and
+// modifies all query-expressions encoded in the URL to contain the required labelmatcher
+func performRedirectWithInject(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		logDebug.Println("old url:", r.URL)
 	}
+
+	username := r.Header.Get("X-prometheus-injectable")
 
 	switch r.URL.Path {
 	case "/api/v1/silences":
@@ -323,22 +325,6 @@ func getClass(n *html.Node) string {
 	return ""
 }
 
-// redirectAfterAuthCheck checks for correct authentication-credentials and either applies
-// the intended redirect or asks for authentication-credentials once again.
-func redirectAfterAuthCheck(w http.ResponseWriter, r *http.Request) {
-	u, p, ok := r.BasicAuth()
-	pass_correct := subtle.ConstantTimeCompare(hashPassword(p), passwords[u]) == 1
-
-	if ok && pass_correct {
-		performRedirect(w, r, u)
-	} else {
-		// send out unauthenticated response asking for basic auth
-		// (to make sure people that mistyped can retry)
-		w.Header().Set("WWW-Authenticate", `Basic realm="all"`)
-		http.Error(w, "Unauthenticated", 401)
-	}
-}
-
 // hashPasswords provides the password-encoding used in PromAuthProxy.
 func hashPassword(pw string) []byte {
 	pwbyte := []byte(pw)
@@ -463,7 +449,7 @@ func main() {
 	file.Close()
 
 	logInfo.Println("starting redirector from", *outerAddress, "to", *innerAddress)
-	http.HandleFunc("/", redirectAfterAuthCheck)
+	http.HandleFunc("/", performRedirectWithInject)
 
 	useTLS := *crt != "" && *key != ""
 	if useTLS {
