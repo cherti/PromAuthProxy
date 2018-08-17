@@ -8,15 +8,17 @@ It enables to use a single Prometheus-instance with multiple users, such that ea
 
 ### with Prometheus
 
-PromAuthProxy is a proxy that sits before the Prometheus-intstance in question and currently supporting HTTP Basic Auth as the authentication method of choice to allow access to the Prometheus behind it.
-To ensure that users only see their own metrics, PromAuthProxy takes a target label (by default the `job`-label), inspects the query that is submitted to the prometheus and ensures that every query includes the target label set to the Basic-Auth-username, either by injecting it if not present or overwriting if specified differently.
-Currently, the target-list and the rules-list are not filtered as this would require modifying the HTML response.
+PromAuthProxy is a proxy that sits before the Prometheus-intstance in question. To ensure that users only see their own metrics, PromAuthProxy takes a target label (by default the `job`-label), inspects the query that is submitted to the prometheus and ensures that every query includes the target label set to the value of the HTTP-Header (by default) `X-prometheus-injectable`, either by injecting it if not present or overwriting if specified differently.
+The `X-Prometheus-injectable` has to be set by a previous component, for example an nginx providing HTTP basic auth or any other component that is able to set such an HTTP-Header. The label used is freely choosable, but should of course be present in the time series (to be ensured via the prometheus-configuration).
+
+In addition to this, when the label `job` is used for such multi-tenancy separation PromAuthProxy also filteres the target list as well as the alerts view as long as the alert names start with the injected job label (such as `"username: CPUbusy"`).
+
 
 ### with Alertmanager
 
-Similar to the Prometheus-Setup, PromAuthProxy injects the target-label with the login name as value into every query and inspection of a silence, as well as into the generation of a new silence.
+Similar to the Prometheus-Setup, PromAuthProxy injects the target-label into every query and inspection of a silence, as well as into the generation of a new silence.
 This means that users can only see alerts with the target-label set to their username and no other and can only generate new silences with the according matcher included (actually users can generate a silence without and the matcher is injected by PromAuthProxy automatically).
-Therefore with PromAuthProxy before users should not be able to tell if other people are using the same alertmanager.
+Therefore with PromAuthProxy before users should not be able to tell if other people are using the same alertmanager except for the names in the dropdown.
 
 ## Building and running
 
@@ -35,11 +37,10 @@ Therefore with PromAuthProxy before users should not be able to tell if other pe
     go get -u "github.com/cherti/promauthproxy"
     ./promauthproxy
 
+
 ## How to use it
 
-By default, promauthproxy reads a `users`-file in the same directory as it is started in.
-Then it creates a reverse HTTP proxy between `:8080` and `127.0.0.1:9090`, which in the default configuration proxies and requests from port 8080 to the Prometheus that (hopefully) listens on `127.0.0.1:9090` and the Prometheus-Interface is visible through the proxy.
-All requests made there are transparently handed over to the Prometheus-instance after the necessary label-injections have been performed and Prometheus' response will be transparently returned as well.
+PromAuthProxy is intended as a proxy between a Prometheus Server/Alertmanager and another proxy tasked with authenticating the user and injecting the required label into the HTTP-request (e.g. an nginx with HTTP basic auth in the most simple case).
 
 ### commandline flag reference
 
@@ -47,28 +48,14 @@ All requests made there are transparently handed over to the Prometheus-instance
       	Log with full details
     -config.log-timestamps
       	Log with timestamps
-    -crt string
-      	path to TLS public key file for outer connection
-    -key string
-      	path to TLS private key file for outer connection
     -inject.label string
       	target label to inject or overwrite (default "job")
-    -passwordfile string
-      	file with user-password-mapping (default "users")
-    -new
-      	create new entry for passwordfile
+    -inject.source string
+        HTTP header specifying label to-be-injected (default "X-prometheus-injectable")
     -web.listen-address string
       	address exposed to outside (default ":8080")
     -web.proxy-to string
       	address to proxy to (default "127.0.0.1:9090")
-
-With the `-new`-flag provided, PromAuthProxy will ask for a username and a password and will output the resulting line for the passwordfile.
-It can, for example, be used via
-
-    promauthproxy -new >> passwordfile
-
-and will write the line in question (and only this line) into the passwordfile as an additional line this way.
-The output-line can also be copied to the file manually, of course.
 
 ## License
 
