@@ -38,8 +38,8 @@ var (
 	innerAddress = flag.String("web.proxy-to", "127.0.0.1:9090", "address to proxy to")
 
 	// misc
-	logTimestamps = flag.Bool("config.log-timestamps", false, "Log with timestamps")
-	debug         = flag.Bool("config.debuglog", false, "Log with full details")
+	logTimestamps = flag.Bool("log.timestamps", false, "Log with timestamps")
+	debug         = flag.Bool("log.debug", false, "Log with full details")
 )
 
 type silence struct {

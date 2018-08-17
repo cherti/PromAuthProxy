@@ -44,9 +44,9 @@ PromAuthProxy is intended as a proxy between a Prometheus Server/Alertmanager an
 
 ### commandline flag reference
 
-    -config.debuglog
+    -log.debug
       	Log with full details
-    -config.log-timestamps
+    -log.timestamps
       	Log with timestamps
     -inject.label string
       	target label to inject or overwrite (default "job")
