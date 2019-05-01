@@ -123,8 +123,9 @@ func injectLabelIntoQuery(r *http.Request, GETparam, label string, createIfAbsen
 		p := r.URL.Query()
 		p.Add(GETparam, "{"+*injectTarget+"="+label+"}")
 		r.URL.RawQuery = p.Encode()
+	} else {
+		r.URL.RawQuery = newqueryparams.Encode()
 	}
-	r.URL.RawQuery = newqueryparams.Encode()
 }
 
 // bufferedResponseWriter behaves like a responseWriter, but bufferes bytes written to it for later
@@ -157,7 +158,7 @@ func performRedirectWithInject(w http.ResponseWriter, r *http.Request) {
 		case "GET":
 			injectLabelIntoQuery(r, "filter", injectedLabel, true, true)
 		}
-	case "/api/v1/alerts":
+	case "/api/v1/alerts": // AM
 		switch r.Method {
 		case "GET":
 			injectLabelIntoQuery(r, "filter", injectedLabel, true, true)
