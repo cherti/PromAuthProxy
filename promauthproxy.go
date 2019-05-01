@@ -367,7 +367,11 @@ func rewriteLabelsets(injected string) func(n promql.Node, path []promql.Node) e
 			for i, l := range n.LabelMatchers {
 				// drop label matcher to be replaced if present
 				if l.Name == *injectTarget {
-					n.LabelMatchers = append(n.LabelMatchers[:i], n.LabelMatchers[i+1:]...)
+					if i+1 >= len(n.LabelMatchers) { // if it's the last matcher in labelMatchers
+						n.LabelMatchers = n.LabelMatchers[:i]
+					} else {
+						n.LabelMatchers = append(n.LabelMatchers[:i], n.LabelMatchers[i+1:]...)
+					}
 				}
 			}
 
