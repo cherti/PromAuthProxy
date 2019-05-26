@@ -78,7 +78,6 @@ func injectLabelIntoNewSilence(r *http.Request, label string) (io.ReadCloser, in
 		}
 	}
 	bodycontent := make([]byte, cl)
-	r.Body.Read(bodycontent)
 	n, err := r.Body.Read(bodycontent)
 	if err != nil && err != io.EOF {
 		logError.Println(err, "; bytes read when error occurred:", n)
