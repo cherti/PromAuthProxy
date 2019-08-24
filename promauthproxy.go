@@ -157,6 +157,12 @@ func performRedirectWithInject(w http.ResponseWriter, r *http.Request) {
 		case "GET":
 			injectLabelIntoQuery(r, "filter", injectedLabel, true, true)
 		}
+	case "/api/v1/series":
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Due to potential cross-tenant-information-leakage this API is currently unavailable."))
+	case "/api/v1/labels":
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Due to potential cross-tenant-information-leakage this API is currently unavailable."))
 	case "/api/v1/alerts": // AM
 		switch r.Method {
 		case "GET":
