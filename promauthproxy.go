@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"compress/gzip"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
@@ -127,6 +128,49 @@ func injectLabelIntoQuery(r *http.Request, GETparam, label string, createIfAbsen
 	}
 }
 
+// seriesResponse can take the response value of a call to /api/v1/series
+type seriesResponse struct {
+	Data   []map[string]string `json:"data"`
+	Status string              `json:"status"`
+}
+
+// filterJSONResponse filters the JSON-response to the prometheus API by label
+func filterJSONResponse(buf []byte, labelName, allowedLabelValue string) ([]byte, error) {
+
+	var thisResponse seriesResponse
+	var filteredResponse seriesResponse
+
+	//fmt.Println("JSON:", string(buf))
+
+	err := json.Unmarshal(buf, &thisResponse)
+	if err != nil {
+		return nil, err
+	}
+
+	filteredResponse.Status = thisResponse.Status
+
+	for _, series := range thisResponse.Data {
+		if _, ok := series[labelName]; !ok {
+			continue
+		}
+		if series[labelName] != allowedLabelValue {
+			continue
+		}
+
+		entry := make(map[string]string)
+		for k, v := range series {
+			entry[k] = v
+		}
+		filteredResponse.Data = append(filteredResponse.Data, entry)
+	}
+
+	response, err := json.Marshal(filteredResponse)
+	if err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
 // bufferedResponseWriter behaves like a responseWriter, but bufferes bytes written to it for later
 // readout and modification. It is intended that those modified bytes are then written to the
 // responseWriter used when creating the bufferedResponseWriter.
@@ -138,6 +182,16 @@ type bufferedResponseWriter struct {
 // Write writes the given bytes to an internal buffer for later read-out.
 func (w *bufferedResponseWriter) Write(p []byte) (n int, err error) {
 	return w.buf.Write(p)
+}
+
+func gunzipData(in []byte) ([]byte, error) {
+	gr, err := gzip.NewReader(bytes.NewBuffer(in))
+	defer gr.Close()
+	out, err := ioutil.ReadAll(gr)
+	if err != nil {
+		return out, err
+	}
+	return out, nil
 }
 
 // performRedirect redirects the incoming request to what is specified in the innerAddress-field and
@@ -158,8 +212,36 @@ func performRedirectWithInject(w http.ResponseWriter, r *http.Request) {
 			injectLabelIntoQuery(r, "filter", injectedLabel, true, true)
 		}
 	case "/api/v1/series":
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Due to potential cross-tenant-information-leakage this API is currently unavailable."))
+		modifier := func(r *http.Response) error {
+			oldBody, err := ioutil.ReadAll(r.Body)
+			content_enc, _ := r.Header["Content-Encoding"]
+
+			gzippedBody := len(content_enc) > 0 && content_enc[0] == "gzip"
+
+			unzippedBody := oldBody
+			if gzippedBody {
+				unzippedBody, err = gunzipData(oldBody)
+				if err != nil {
+					logError.Println(err)
+					return err
+				}
+
+				// we will not recompress afterwards, so drop the encoding
+				r.Header["Content-Encoding"] = []string{}
+			}
+
+			newBody, err := filterJSONResponse(unzippedBody, *injectTarget, injectedLabel)
+			if err != nil {
+				logError.Println(err)
+				return err
+			}
+
+			r.Body = ioutil.NopCloser(bytes.NewReader(newBody))
+			return nil
+		}
+		seriesProxy := &httputil.ReverseProxy{Director: director, ModifyResponse: modifier}
+		seriesProxy.ServeHTTP(w, r)
+		return
 	case "/api/v1/labels":
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Due to potential cross-tenant-information-leakage this API is currently unavailable."))
