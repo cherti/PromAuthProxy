@@ -20,6 +20,45 @@ Similar to the Prometheus-Setup, PromAuthProxy injects the target-label into eve
 This means that users can only see alerts with the target-label set to their username and no other and can only generate new silences with the according matcher included (actually users can generate a silence without and the matcher is injected by PromAuthProxy automatically).
 Therefore with PromAuthProxy before users should not be able to tell if other people are using the same alertmanager except for the names in the dropdown.
 
+
+## Multi-tenant capable API-endpoints
+
+The PromAuthProxy is capable of introducing multitenancy for most of the API-endpoints of Prometheus and its Alertmanager.
+Specifically, detailed support for APIs is listed below.
+Unavailable APIs are blocked in the current implementation of PromAuthProxy to avoid accidential leakage.
+
+### Prometheus
+
+Multi-tenatiated APIs:
+
+  * `/api/v1/query`
+  * `/api/v1/query_range`
+  * `/api/v1/targets`
+  * `/api/v1/series`
+  * `/federate`
+  * `/targets`: filtered on HTML-level
+  * `/alerts`: filtered on HTML-level
+
+Unavailable APIs:
+
+  * `/api/v1/labels`
+
+Specially handled APIs:
+
+  * `/service-discovery`: currently redirected to `/targets`
+
+Unhandled APIs:
+
+  * `/api/v1/rules`, as rules are currently not hidden in the HTML of the webinterface anyways.
+
+### Alertmanager
+
+Multi-tenatiated APIs:
+
+  * `/api/v1/alerts`
+  * `/api/v1/silences`
+
+
 ## Building and running
 
 ### manually
