@@ -120,7 +120,11 @@ func injectLabelIntoQuery(r *http.Request, GETparam, label string, createIfAbsen
 
 	if !found && createIfAbsent {
 		p := r.URL.Query()
-		p.Add(GETparam, "{"+*injectTarget+"="+label+"}")
+		if ensureBracketEnclose {
+			p.Add(GETparam, "{"+*injectTarget+"="+label+"}")
+		} else {
+			p.Add(GETparam, *injectTarget+"="+label)
+		}
 		r.URL.RawQuery = p.Encode()
 	} else {
 		r.URL.RawQuery = newqueryparams.Encode()
@@ -162,7 +166,7 @@ func performRedirectWithInject(w http.ResponseWriter, r *http.Request) {
 		case "POST":
 			r.Body, r.ContentLength = injectLabelIntoNewSilence(r, injectedLabel)
 		case "GET":
-			injectLabelIntoQuery(r, "filter", injectedLabel, true, true)
+			injectLabelIntoQuery(r, "filter", injectedLabel, true, false)
 		}
 	case "/api/v1/series":
 		injectLabelIntoQuery(r, "match[]", injectedLabel, true, false)
