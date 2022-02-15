@@ -19,7 +19,7 @@ import (
 	"strings"
 
 	"github.com/prometheus/prometheus/pkg/labels"
-	"github.com/prometheus/prometheus/promql/parser"
+	"github.com/prometheus/prometheus/promql"
 	"golang.org/x/net/html"
 )
 
@@ -363,14 +363,14 @@ func createPasswordEntry() {
 // labelmatchers.
 func modifyQuery(q, injectable string) string {
 	logDebug.Println("Incoming query:", q)
-	expr, err := parser.ParseExpr(q)
+	expr, err := promql.ParseExpr(q)
 	if err != nil {
 		// Prometheus will return a failure as well and not hand out any results
 		// but instead define the syntax error. The corrected query will then
 		// evaluate correctly and the appropriate label injected
 		return q
 	}
-	parser.Inspect(expr, rewriteLabelsets(injectable))
+	promql.Inspect(expr, rewriteLabelsets(injectable))
 	q = expr.String()
 	logDebug.Println("Outgoing query:", q)
 	return q
@@ -379,10 +379,10 @@ func modifyQuery(q, injectable string) string {
 // rewriteLabelsets returns the function that will be used to walk the
 // Prometheus-query-expression-tree and rewrites the necessary selectors with
 // to the specified injected label before the query is handed over to Prometheus.
-func rewriteLabelsets(injected string) func(n parser.Node, path []parser.Node) error {
-	return func(n parser.Node, path []parser.Node) error {
+func rewriteLabelsets(injected string) func(n promql.Node, path []promql.Node) error {
+	return func(n promql.Node, path []promql.Node) error {
 		switch n := n.(type) {
-		case *parser.VectorSelector:
+		case *promql.VectorSelector:
 			// check if label is already present, replace in this case
 			for i, l := range n.LabelMatchers {
 				// drop label matcher to be replaced if present
